@@ -481,6 +481,7 @@ class TypeRegistry {
 			Connection\EntriesConnection::class,
 			Connection\FormsConnection::class,
 			Connection\FormFieldsConnection::class,
+			Connection\FormFieldsRootQueryConnection::class
 		];
 
 		/**
