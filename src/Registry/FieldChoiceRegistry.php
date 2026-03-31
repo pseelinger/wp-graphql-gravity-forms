@@ -18,7 +18,7 @@ use WPGraphQL\GF\Registry\TypeRegistry as GFTypeRegistry;
 use WPGraphQL\GF\Type\WPInterface\FieldChoice;
 use WPGraphQL\GF\Utils\Compat;
 use WPGraphQL\GF\Utils\Utils;
-use WPGraphQL\Registry\TypeRegistry;
+
 
 /**
  * Class - FieldChoiceRegistry
@@ -61,7 +61,7 @@ class FieldChoiceRegistry {
 	public static function register( GF_Field $field, array $settings, bool $as_interface = false ): void {
 		add_action(
 			get_graphql_register_action(),
-			static function ( TypeRegistry $type_registry ) use ( $field, $settings, $as_interface ) {
+			static function () use ( $field, $settings, $as_interface ) {
 				$choice_name = self::get_type_name( $field );
 
 				// Skip if already registered.
@@ -72,15 +72,9 @@ class FieldChoiceRegistry {
 				$config = self::get_config_from_settings( $choice_name, $field, $settings );
 
 				if ( $as_interface ) {
-					$config['resolveType'] = static function ( $value ) use ( $type_registry ) {
-						if ( ! isset( $value['graphql_type'] ) ) {
-							return null;
-						}
-						$type = $type_registry->get_type( $value['graphql_type'] );
-						return $type ?: null;
+					$config['resolveType'] = static function () use ( $choice_name ) {
+						return $choice_name;
 					};
-
-					$config['eagerlyLoadType'] = true;
 
 					register_graphql_interface_type( $choice_name, Compat::resolve_graphql_config( $config ) );
 				} else {
@@ -99,7 +93,8 @@ class FieldChoiceRegistry {
 
 				// Store in static array to prevent duplicate registration.
 				self::$registered_types[] = $choice_name;
-			}
+			},
+			11
 		);
 	}
 
@@ -110,7 +105,7 @@ class FieldChoiceRegistry {
 	 * @param \GF_Field $field The Gravity Forms field object.
 	 * @param string[]  $settings The Gravity Forms field settings.
 	 *
-	 * @return array{description:callable():string,interfaces:string[],fields:array<string,array<string,mixed>>,eagerlyLoadType:bool}
+	 * @return array{description:callable():string,interfaces:string[],fields:array<string,array<string,mixed>>}
 	 */
 	public static function get_config_from_settings( string $choice_name, GF_Field $field, array $settings ): array {
 		$interfaces = self::get_interfaces( $settings );
@@ -118,14 +113,13 @@ class FieldChoiceRegistry {
 		$fields = self::get_fields( $choice_name, $field, $settings, $interfaces );
 
 		return [
-			'description'     => static fn () => sprintf(
+			'description' => static fn () => sprintf(
 				// translators: GF field choice type.
 				__( '%s choice values.', 'wp-graphql-gravity-forms' ),
 				ucfirst( $choice_name )
 			),
-			'interfaces'      => $interfaces,
-			'fields'          => $fields,
-			'eagerlyLoadType' => true,
+			'interfaces'  => $interfaces,
+			'fields'      => $fields,
 		];
 	}
 

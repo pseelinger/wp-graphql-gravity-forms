@@ -18,7 +18,6 @@ use WPGraphQL\GF\Registry\TypeRegistry as GFTypeRegistry;
 use WPGraphQL\GF\Type\WPInterface\FieldInput;
 use WPGraphQL\GF\Utils\Compat;
 use WPGraphQL\GF\Utils\Utils;
-use WPGraphQL\Registry\TypeRegistry;
 
 /**
  * Class - FieldInputRegistry
@@ -64,7 +63,7 @@ class FieldInputRegistry {
 	public static function register( GF_Field $field, array $settings, bool $as_interface = false ): void {
 		add_action(
 			get_graphql_register_action(),
-			static function ( TypeRegistry $type_registry ) use ( $field, $settings, $as_interface ) {
+			static function () use ( $field, $settings, $as_interface ) {
 				$input_name = self::get_type_name( $field );
 
 				// Skip if already registered.
@@ -75,15 +74,10 @@ class FieldInputRegistry {
 				$config = self::get_config_from_settings( $input_name, $field, $settings );
 
 				if ( $as_interface ) {
-					$config['resolveType'] = static function ( $value ) use ( $type_registry ) {
-						if ( ! isset( $value['graphql_type'] ) ) {
-							return null;
-						}
-						$type = $type_registry->get_type( $value['graphql_type'] );
-						return $type ?: null;
+					$config['resolveType'] = static function () use ( $input_name ) {
+						return $input_name;
 					};
 
-					$config['eagerlyLoadType'] = true;
 					register_graphql_interface_type( $input_name, Compat::resolve_graphql_config( $config ) );
 				} else {
 					$parent_input_name = Utils::get_safe_form_field_type_name( $field->type . 'InputProperty' );
@@ -100,7 +94,8 @@ class FieldInputRegistry {
 
 				// Store in static array to prevent duplicate registration.
 				self::$registered_types[] = $input_name;
-			}
+			},
+			11
 		);
 	}
 
@@ -111,7 +106,7 @@ class FieldInputRegistry {
 	 * @param \GF_Field $field The Gravity Forms field object.
 	 * @param string[]  $settings The Gravity Forms field settings.
 	 *
-	 * @return array{description:callable():string,interfaces:string[],fields:array<string,array<string,mixed>>,eagerlyLoadType:bool}
+	 * @return array{description:callable():string,interfaces:string[],fields:array<string,array<string,mixed>>}
 	 */
 	public static function get_config_from_settings( string $input_name, GF_Field $field, array $settings ): array {
 		$interfaces = self::get_interfaces( $settings );
@@ -119,14 +114,13 @@ class FieldInputRegistry {
 		$fields = self::get_fields( $input_name, $field, $settings, $interfaces );
 
 		return [
-			'description'     => static fn () => sprintf(
+			'description' => static fn () => sprintf(
 				// translators: GF field input type.
 				__( '%s input values.', 'wp-graphql-gravity-forms' ),
 				ucfirst( $input_name )
 			),
-			'interfaces'      => $interfaces,
-			'fields'          => $fields,
-			'eagerlyLoadType' => true,
+			'interfaces'  => $interfaces,
+			'fields'      => $fields,
 		];
 	}
 
