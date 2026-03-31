@@ -11,6 +11,7 @@ declare( strict_types = 1 );
 namespace WPGraphQL\GF\Registry;
 
 use Exception;
+use GF_Fields;
 use WPGraphQL\GF\Connection;
 use WPGraphQL\GF\Interfaces\Hookable;
 use WPGraphQL\GF\Mutation;
@@ -73,6 +74,7 @@ class TypeRegistry {
 		 */
 		do_action( 'graphql_gf_before_register_types' );
 		add_action( 'graphql_init', static fn () => self::initialize_registry(), 10, 0 );
+		add_action( 'graphql_register_types', [ __CLASS__, 'register_graphql_types' ] );
 
 		/**
 		 * Fires after all types have been registered.
@@ -97,6 +99,60 @@ class TypeRegistry {
 		self::$registered_classes = $classes_to_register;
 
 		self::register_types( self::$registered_classes );
+	}
+
+	/**
+	 * Manually register all the types to the schema.
+	 *
+	 * This is a workaround for a bug in WPGraphQL where `eagerlyLoadType` is not respected for non-introspection queries.
+	 *
+	 * @see https://github.com/wp-graphql/wp-graphql/issues/2360
+	 */
+	public static function register_graphql_types(): void {
+		$fields = GF_Fields::get_all();
+
+		foreach ( $fields as $field ) {
+			$field_settings = FormFieldRegistry::get_field_settings( $field );
+
+			$has_choices = array_intersect(
+				$field_settings,
+				[
+					WPInterface\FieldSetting\FieldWithChoices::$field_setting,
+					WPInterface\FieldSetting\FieldWithColumns::$field_setting,
+					WPInterface\FieldSetting\FieldWithName::$field_setting,
+					WPInterface\FieldSetting\FieldWithSelectAllChoices::$field_setting,
+					WPInterface\FieldSetting\FieldWithOtherChoice::$field_setting,
+				]
+			);
+
+			if ( ! empty( $has_choices ) ) {
+				graphql_register_type(
+					FieldChoiceRegistry::get_type_name( $field ),
+					FieldChoiceRegistry::get_config_from_settings( FieldChoiceRegistry::get_type_name( $field ), $field, $field_settings )
+				);
+			}
+
+			$has_inputs = array_intersect(
+				$field_settings,
+				[
+					WPInterface\FieldSetting\FieldWithAddress::$field_setting,
+					WPInterface\FieldSetting\FieldWithDateFormat::$field_setting,
+					WPInterface\FieldSetting\FieldWithEmailConfirmation::$field_setting,
+					WPInterface\FieldSetting\FieldWithName::$field_setting,
+					WPInterface\FieldSetting\FieldWithPassword::$field_setting,
+					WPInterface\FieldSetting\FieldWithSingleProductInputs::$field_setting,
+					WPInterface\FieldSetting\FieldWithTimeFormat::$field_setting,
+					WPInterface\FieldSetting\FieldWithSelectAllChoices::$field_setting,
+				]
+			);
+
+			if ( ! empty( $has_inputs ) ) {
+				graphql_register_type(
+					FieldInputRegistry::get_type_name( $field ),
+					FieldInputRegistry::get_config_from_settings( FieldInputRegistry::get_type_name( $field ), $field, $field_settings )
+				);
+			}
+		}
 	}
 
 	/**
