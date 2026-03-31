@@ -18,6 +18,7 @@ use WPGraphQL\GF\Registry\TypeRegistry as GFTypeRegistry;
 use WPGraphQL\GF\Type\WPInterface\FieldInput;
 use WPGraphQL\GF\Utils\Compat;
 use WPGraphQL\GF\Utils\Utils;
+use WPGraphQL\Registry\TypeRegistry;
 
 /**
  * Class - FieldInputRegistry
@@ -63,7 +64,7 @@ class FieldInputRegistry {
 	public static function register( GF_Field $field, array $settings, bool $as_interface = false ): void {
 		add_action(
 			get_graphql_register_action(),
-			static function () use ( $field, $settings, $as_interface ) {
+			static function ( TypeRegistry $type_registry ) use ( $field, $settings, $as_interface ) {
 				$input_name = self::get_type_name( $field );
 
 				// Skip if already registered.
@@ -74,8 +75,12 @@ class FieldInputRegistry {
 				$config = self::get_config_from_settings( $input_name, $field, $settings );
 
 				if ( $as_interface ) {
-					$config['resolveType'] = static function ( $type ) {
-						return $type['graphql_type'];
+					$config['resolveType'] = static function ( $value ) use ( $type_registry ) {
+						if ( ! isset( $value['graphql_type'] ) ) {
+							return null;
+						}
+						$type = $type_registry->get_type( $value['graphql_type'] );
+						return $type ?: null;
 					};
 
 					$config['eagerlyLoadType'] = true;
