@@ -72,8 +72,8 @@ class FieldChoiceRegistry {
 				$config = self::get_config_from_settings( $choice_name, $field, $settings );
 
 				if ( $as_interface ) {
-					$config['resolveType'] = static function () use ( $choice_name ) {
-						return $choice_name;
+					$config['resolveType'] = static function ( $type ) {
+						return $type['graphql_type'];
 					};
 
 					$config['eagerlyLoadType'] = true;
